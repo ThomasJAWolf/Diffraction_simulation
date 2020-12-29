@@ -1,14 +1,15 @@
 """
-Code example for the simulation of electron diffraction patterns based on molecular geometries 
+Classes and functions for the simulation of electron diffraction patterns based on molecular geometries 
 within the independent atom model. The simulations yield results compatible with the electron 
 beam parameters of the MeV Ultrafast Electron Diffraction (UED) facility at SLAC National 
 Accelerator Laboratory (https://lcls.slac.stanford.edu/instruments/mev-ued). 
 Created by Thomas Wolf, 02/26/2020
+Modifided by Thomas Wolf, 12/29/2020
 """
 
 import numpy as np
 from scipy.interpolate import interp1d
-import matplotlib.pyplot as plt
+import os
 
 ############################################################################################################
 ## Classes and functions ###################################################################################
@@ -84,7 +85,8 @@ class Atomic_Scattering_Cross_Sections():
         if len(Element)<2:
             Element = Element + ' '
             
-        with open(Element + '3p7MeV.dat') as f:
+        dirname = os.path.dirname(__file__)
+        with open(dirname + '/' + Element + '3p7MeV.dat') as f:
             lines = f.readlines()
         
         for i,line in enumerate(lines):
@@ -164,6 +166,7 @@ class Diffraction():
                     self.I_mol_1D += abs(fmap[i])*abs(fmap[j])*np.sin(dist*self.s)/(dist*self.s)
 
         self.sM_1D = self.s*self.I_mol_1D/self.I_at_1D # Modified molecular diffraction
+        self.get_zero_crossings()
         
     def make_2D_diffraction(self):
         """
@@ -192,88 +195,16 @@ class Diffraction():
 
         self.sM_2D = self.sr*self.I_mol_2D/self.I_at_2D # Modified molecular diffraction
         
-############################################################################################################
-## Example code for diffraction of 1,3-cyclohexadiene ######################################################
-############################################################################################################
-
-fname = 'CHD_6-31Gd.xyz'
-
-CHD_geo = mol_geom(fname)
-
-AtScatXSect = Atomic_Scattering_Cross_Sections()
-
-# Figure showing atomic scattering cross-sections
-plt.figure()
-for element in AtScatXSect.supported_elements:
-    exec('plt.plot(AtScatXSect.thetadeg,AtScatXSect.' + element + ", label='" + element + "')")
-
-plt.title('Differential Atomic scattering cross-sections from ELSEPA')
-plt.legend(loc='best')
-plt.xlim(0,0.5)
-plt.ylabel('Differential cross-section / $a_{0}^{2}/{sr}$')
-plt.xlabel('Scattering angle / $^{\circ}$')
-
-CHD_Diff = Diffraction(CHD_geo,AtScatXSect)
-CHD_Diff.make_1D_diffraction()
-
-# Figure showing 1D diffraction
-plt.figure()
-
-plt.subplot(2,2,1)
-plt.title('Atomic contribution')
-plt.semilogy(CHD_Diff.s,CHD_Diff.I_at_1D)
-plt.xlabel('s / $\AA^{-1}$')
-plt.ylabel('$\sigma$ / $a_{0}^{2}/{sr}$')
-
-plt.subplot(2,2,2)
-plt.title('Molecular contribution')
-plt.plot(CHD_Diff.s,CHD_Diff.I_mol_1D)
-plt.xlabel('s / $\AA^{-1}$')
-plt.ylabel('$\sigma$ / $a_{0}^{2}/{sr}$')
-
-plt.subplot(2,2,3)
-plt.title('Total signal')
-plt.semilogy(CHD_Diff.s,CHD_Diff.I_mol_1D+CHD_Diff.I_at_1D)
-plt.xlabel('s / $\AA^{-1}$')
-plt.ylabel('$\sigma$ / $a_{0}^{2}/{sr}$')
-
-plt.subplot(2,2,4)
-plt.title('Modified diffraction')
-plt.plot(CHD_Diff.s,CHD_Diff.sM_1D)
-plt.xlabel('s / $\AA^{-1}$')
-plt.ylabel('$\sigma$ / $a_{0}^{2}/{sr}$')
-plt.tight_layout()
-
-CHD_Diff.make_2D_diffraction()
-
-# Figure showing 2D diffraction. The limits of the color bar (vmin, vmax) will have to
-# be adjusted for other molecules.
-plt.figure()
-plt.subplot(2,2,1)
-plt.title('Atomic contribution')
-plt.pcolormesh(CHD_Diff.sy,CHD_Diff.sz,CHD_Diff.I_at_2D)
-plt.xlabel('s / $\AA^{-1}$')
-plt.ylabel('s / $\AA^{-1}$')
-plt.colorbar()
-
-plt.subplot(2,2,2)
-plt.title('Molecular contribution')
-plt.pcolormesh(CHD_Diff.sy,CHD_Diff.sz,CHD_Diff.I_mol_2D,vmin=-1000,vmax = 10000)
-plt.xlabel('s / $\AA^{-1}$')
-plt.ylabel('s / $\AA^{-1}$')
-plt.colorbar()
-
-plt.subplot(2,2,3)
-plt.title('Total signal')
-plt.pcolormesh(CHD_Diff.sy,CHD_Diff.sz,CHD_Diff.I_mol_2D+CHD_Diff.I_at_2D,vmin=0,vmax = 10000)
-plt.xlabel('s / $\AA^{-1}$')
-plt.ylabel('s / $\AA^{-1}$')
-plt.colorbar()
-
-plt.subplot(2,2,4)
-plt.title('Modified diffraction')
-plt.pcolormesh(CHD_Diff.sy,CHD_Diff.sz,CHD_Diff.sM_2D)
-plt.xlabel('s / $\AA^{-1}$')
-plt.ylabel('s / $\AA^{-1}$')
-plt.colorbar()
-plt.show()
+    def get_zero_crossings(self):
+        """
+        Function to get the zero crossings of the 1D modified molecular diffraction.
+        """
+        self.zcross = []
+        for i in np.arange(len(self.sM_1D)-1):
+            if self.sM_1D[i]<=0 and self.sM_1D[i+1]>0:
+                ind = abs(np.array([self.sM_1D[i], self.sM_1D[i+1]])).argmin()
+                self.zcross.append(self.s[i+ind])
+            elif self.sM_1D[i]>=0 and self.sM_1D[i+1]<0:
+                ind = abs(np.array([self.sM_1D[i], self.sM_1D[i+1]])).argmin()
+                self.zcross.append(self.s[i+ind])
+        self.zcross = np.array(self.zcross)
