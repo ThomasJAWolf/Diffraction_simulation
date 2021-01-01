@@ -4,12 +4,14 @@ within the independent atom model. The simulations yield results compatible with
 beam parameters of the MeV Ultrafast Electron Diffraction (UED) facility at SLAC National 
 Accelerator Laboratory (https://lcls.slac.stanford.edu/instruments/mev-ued). 
 Created by Thomas Wolf, 02/26/2020
-Modifided by Thomas Wolf, 12/29/2020
+Modified by Thomas Wolf, 12/29/2020
+Modified by Thomas Wolf, 01/01/2021
 """
 
 import numpy as np
 from scipy.interpolate import interp1d
 import os
+from scipy.io import loadmat
 
 ############################################################################################################
 ## Classes and functions ###################################################################################
@@ -54,75 +56,26 @@ class mol_geom():
             self.coordinates[i,2] = float(arr[3])
             
 ############################################################################################################
-            
-class Atomic_Scattering_Cross_Sections():
-    """
-    Creates an object containing form factors for different elements. This class currently 
-    supports the following elements: H, He, C, N, O, F, S, Fe, Br, I. The form factors are
-    calculated with the ELSEPA program (https://github.com/eScatter/elsepa) assuming the 
-    standard electron kinetic energy of 3.7 MeV used at the SLAC UED facility. This class must
-    be modified to add unsupported elements.
-    """
-    def __init__(self):
-        """
-        Function to initialize the form factor object by loading form factors.
-        """
-        # This line must be edited to add elements:
-        self.supported_elements = ['H', 'He', 'C', 'N', 'O', 'F', 'S', 'Fe', 'Br', 'I']
-        for element in self.supported_elements:
-            exec('self.' + element +", self.thetadeg = self.load_form_fact('" + element + "')")
-    
-    def load_form_fact(self,Element):
-        """
-        Function to load the scattering form factor for a specific element from an ELSEPA
-        output file. 
-        Arguments:
-        Element:  Element symbol as string
-        Returns:
-        FF:       Angle-dependent scattering intensity in units of a0^2/sr
-        thetadeg: Scattering angle in degrees
-        """
-        if len(Element)<2:
-            Element = Element + ' '
-            
-        dirname = os.path.dirname(__file__)
-        with open(dirname + '/' + Element + '3p7MeV.dat') as f:
-            lines = f.readlines()
-        
-        for i,line in enumerate(lines):
-            if line.find('#')!=-1:
-                continue
-            else:
-                break
-                
-        lines = lines[i:]
-        thetadeg = np.zeros((len(lines),))
-        FF = np.zeros_like(thetadeg)
-        for i in np.arange(len(lines)):
-            thetadeg[i] = (float(lines[i].split()[0]))
-            FF[i] = (float(lines[i].split()[3]))
-        return FF, thetadeg
-        
-from scipy.interpolate import interp1d
-
-############################################################################################################
 
 class Diffraction():
     """
     Creates a diffraction object.
     Arguments:
     geom:   mol_geom object
-    AtScatXSect: Scattering cross-section object
+    Xsectfile: File containing atomic scattering cross-sections. The code expects a dictionary returning a 2D
+               array with scattering angles in the first row and scattering cross-sections in the second row.
     Npixel: Length of Q-array
     Max_Q:  Maximum Q in inverse Angstroms
     """
-    def __init__(self,geom,AtScatXSect,Npixel=120,Max_s=12):
+    def __init__(self,geom,Npixel=120,Max_s=12,Xsectfile='Xsects.mat'):
         """
         Function to initialize Diffraction object.
         """
         self.coordinates = geom.coordinates
         self.elements = geom.elements
-        self.AtScatXSect = AtScatXSect
+        dirname = os.path.dirname(__file__)
+        self.XSects = loadmat(dirname + '/' + Xsectfile)
+        del self.XSects['__header__'], self.XSects['__version__'], self.XSects['__globals__']
         self.U = 3.7 # Electron kinetic energy
         self.Max_s = Max_s
         self.Npixel = Npixel
@@ -135,7 +88,7 @@ class Diffraction():
         lambdaEl=h/np.sqrt(2*m*E)/np.sqrt(1+E/(2*m*c**2)) # Electron wavelength
         k=2*np.pi/lambdaEl # Electron wave vector
 
-        thetarad = self.AtScatXSect.thetadeg/360*2*np.pi
+        thetarad = self.XSects['C'][0,:]/360*2*np.pi # Could be any other element. 
         self.a = 4*np.pi/lambdaEl*np.sin(thetarad/2)/1E10
         
         
@@ -152,8 +105,7 @@ class Diffraction():
         self.I_at_1D = np.zeros((len(self.s),)) # Atomic scattering contribution to diffraction signal
         fmap = []
         for element in self.elements:
-            namespace = {'interp1d'}
-            f = eval('interp1d(self.a,np.sqrt(self.AtScatXSect.' + element + '))')
+            f = interp1d(self.a,np.sqrt(self.XSects[element][1,:]))
             fmap.append(f(self.s))
             self.I_at_1D += np.square(abs(f(self.s)))
 
@@ -173,15 +125,15 @@ class Diffraction():
         Function to create a 2D diffraction pattern assuming an ensemble of randomly oriented
         molecules.
         """
-        self.sy,self.sz = np.meshgrid(np.arange(-1*self.Max_s,self.Max_s,2*self.Max_s/self.Npixel), \
-                            np.arange(-1*self.Max_s,self.Max_s,2*self.Max_s/self.Npixel))
+        self.sy,self.sz = np.meshgrid(np.arange(-1*self.Max_s,self.Max_s,2*float(self.Max_s)/self.Npixel), \
+                            np.arange(-1*self.Max_s,self.Max_s,2*float(self.Max_s)/self.Npixel))
         self.sr = np.sqrt(np.square(self.sy)+np.square(self.sz))
         natom = len(self.elements)
 
         self.I_at_2D = np.zeros_like(self.sr) # Atomic scattering contribution to diffraction signal
         fmap = []
         for element in self.elements:
-            f = eval('interp1d(self.a,np.sqrt(self.AtScatXSect.' + element + '))')
+            f = interp1d(self.a,np.sqrt(self.XSects[element][1,:]))
             fmap.append(f(self.sr))
             self.I_at_2D += np.square(abs(f(self.sr)))
 
