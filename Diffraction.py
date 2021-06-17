@@ -24,11 +24,8 @@ class mol_geom():
     filename: Path to a molecular geometry (*.xyz) file. See below for the file format expected
     by the code.
     """
-    def __init__(self,filename):
-        """
-        Function to initialize the geometry object by loading geometry data.
-        """
-        self.loadxyz(filename)
+    def __init__(self):
+        pass
         
     def loadxyz(self,filename):
         """
@@ -54,6 +51,17 @@ class mol_geom():
             self.coordinates[i,0] = float(arr[1])
             self.coordinates[i,1] = float(arr[2])
             self.coordinates[i,2] = float(arr[3])
+            
+    def set_geometry(self, coords, elements):
+        """
+        Function to set arbitrary coordinates.
+        Arguments:
+        coords  : 2D numpy array with element in first dimension and xyz coordinates in second
+                  dimension.
+        elements: list of element symbols as strings.
+        """
+        self.coordinates = coords
+        self.elements = elements
             
 ############################################################################################################
 

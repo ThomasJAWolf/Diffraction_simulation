@@ -18,7 +18,8 @@ from Diffraction import *
 
 fname = 'CHD_6-31Gd.xyz'
 
-CHD_geo = mol_geom(fname)
+CHD_geo = mol_geom()
+CHD_geo.loadxyz(fname)
 CHD_Diff = Diffraction(CHD_geo)
 
 # Figure showing atomic scattering cross-sections
