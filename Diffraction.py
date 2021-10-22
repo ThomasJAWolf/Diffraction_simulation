@@ -119,12 +119,15 @@ class Diffraction():
 
         # Contribution from interference between atoms to diffaction signal:
         self.I_mol_1D = np.zeros_like(self.I_at_1D) 
+	# Set zero values to a small nonzero value to avoid division by zero
+	for k in range(len(self.s)):
+	    if (abs(self.s[k]) < 1.0e-18):
+	       self.s[k]=1.0e-18
         for i in np.arange(natom):
             for j in np.arange(natom):
                 if i!=j:
                     dist = np.sqrt(np.square(self.coordinates[i,:]-self.coordinates[j,:]).sum())
-                    self.I_mol_1D += abs(fmap[i])*abs(fmap[j])*np.sin(dist*self.s)/(dist*self.s)
-
+		    self.I_mol_1D += abs(fmap[i])*abs(fmap[j])*np.sin(dist*self.s)/(dist*self.s)
         self.sM_1D = self.s*self.I_mol_1D/self.I_at_1D # Modified molecular diffraction
         self.get_zero_crossings()
         
