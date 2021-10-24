@@ -120,9 +120,9 @@ class Diffraction():
         # Contribution from interference between atoms to diffaction signal:
         self.I_mol_1D = np.zeros_like(self.I_at_1D) 
 	# Set zero values to a small nonzero value to avoid division by zero
-	for k in range(len(self.s)):
+        for k in range(len(self.s)):
 	    if (abs(self.s[k]) < 1.0e-18):
-	       self.s[k]=1.0e-18
+	        self.s[k]=1.0e-18
         for i in np.arange(natom):
             for j in np.arange(natom):
                 if i!=j:
