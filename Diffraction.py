@@ -127,7 +127,7 @@ class Diffraction():
             for j in np.arange(natom):
                 if i!=j:
                     dist = np.sqrt(np.square(self.coordinates[i,:]-self.coordinates[j,:]).sum())
-            self.I_mol_1D += abs(fmap[i])*abs(fmap[j])*np.sin(dist*self.s)/(dist*self.s)
+                    self.I_mol_1D += abs(fmap[i])*abs(fmap[j])*np.sin(dist*self.s)/(dist*self.s)
         self.sM_1D = self.s*self.I_mol_1D/self.I_at_1D # Modified molecular diffraction
         self.get_zero_crossings()
         
