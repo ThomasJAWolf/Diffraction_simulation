@@ -106,7 +106,7 @@ class Diffraction():
         molecules.
         """
         natom = len(self.elements)
-        self.s = np.linspace(0,np.float(self.Max_s),self.Npixel)
+        self.s = np.linspace(0,float(self.Max_s),self.Npixel)
 
         
 
