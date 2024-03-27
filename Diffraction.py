@@ -6,12 +6,14 @@ Accelerator Laboratory (https://lcls.slac.stanford.edu/instruments/mev-ued).
 Created by Thomas Wolf, 02/26/2020
 Modified by Thomas Wolf, 12/29/2020
 Modified by Thomas Wolf, 01/01/2021
+Modified by Xinxin Cheng, 05/26/2022
 """
 
 import numpy as np
 from scipy.interpolate import interp1d
 import os
 from scipy.io import loadmat
+import pickle
 
 ############################################################################################################
 ## Classes and functions ###################################################################################
@@ -69,36 +71,47 @@ class Diffraction():
     """
     Creates a diffraction object.
     Arguments:
-    geom:   mol_geom object
-    Xsectfile: File containing atomic scattering cross-sections. The code expects a dictionary returning a 2D
-               array with scattering angles in the first row and scattering cross-sections in the second row.
-    Npixel: Length of Q-array
-    Max_Q:  Maximum Q in inverse Angstroms
+    geom           : mol_geom object
+    Npixel         :  Length of Q-array
+    Max_Q          : Maximum Q in inverse Angstroms
+    diffractionType: Type of desired diffraction, can be 'electron' or'xray'.
+                     Electron scattering cross-sections are calculated using 
+                     the elsepa program (xhttps://github.com/eScatter/elsepa) 
+                     assuming a kinetic energy of 3.7 MeV.
     """
-    def __init__(self,geom,Npixel=120,Max_s=12,Xsectfile='Xsects.mat'):
+    def __init__(self,geom,Npixel=120,Max_s=12,diffractionType='electron'):
         """
         Function to initialize Diffraction object.
         """
         self.coordinates = geom.coordinates
         self.elements = geom.elements
-        dirname = os.path.dirname(__file__)
-        self.XSects = loadmat(dirname + '/' + Xsectfile)
-        del self.XSects['__header__'], self.XSects['__version__'], self.XSects['__globals__']
-        self.U = 3.7 # Electron kinetic energy
+        self.diffractionType = diffractionType
         self.Max_s = Max_s
         self.Npixel = Npixel
+        dirname = os.path.dirname(__file__)
         
-        E=self.U*1e6*1.6022*1e-19
-        m=9.1094e-31
-        h=6.6261e-34
-        c=299792458
+        if (self.diffractionType == 'electron'):
+            Xsectfile='Xsects.mat'
+            self.XSects = loadmat(dirname + '/' + Xsectfile)
+            del self.XSects['__header__'], self.XSects['__version__'], self.XSects['__globals__']
+            self.U = 3.7 # Electron kinetic energy, the saved cross-section was calculated with 3.7 MeV, although we are currently using 4.2 MeV for real experiment
 
-        lambdaEl=h/np.sqrt(2*m*E)/np.sqrt(1+E/(2*m*c**2)) # Electron wavelength
-        k=2*np.pi/lambdaEl # Electron wave vector
+            E=self.U*1e6*1.6022*1e-19
+            m=9.1094e-31
+            h=6.6261e-34
+            c=299792458
 
-        thetarad = self.XSects['C'][0,:]/360*2*np.pi # Could be any other element. 
-        self.a = 4*np.pi/lambdaEl*np.sin(thetarad/2)/1E10
-        
+            lambdaEl=h/np.sqrt(2*m*E)/np.sqrt(1+E/(2*m*c**2)) # Electron wavelength
+            k=2*np.pi/lambdaEl # Electron wave vector
+
+            thetarad = self.XSects['C'][0,:]/360*2*np.pi # Could be any other element. Convert degree to rad.
+            self.a = 4*np.pi/lambdaEl*np.sin(thetarad/2)/1E10
+            
+        elif (self.diffractionType == 'xray'):
+            Xsectfile='Xsects.pkl'
+            with open(dirname + '/' + Xsectfile, "rb") as f:
+                self.XSects = pickle.load(f)
+            self.a = self.XSects['C'][0,:]
         
     def make_1D_diffraction(self):
         """
