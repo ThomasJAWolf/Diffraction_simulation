@@ -63,7 +63,7 @@ class mol_geom():
                   dimension.
         elements: list of element symbols as strings.
         """
-        self.coordinates = coords
+        self.coordinates = np.array(coords)
         self.elements = elements
             
 ############################################################################################################
@@ -145,9 +145,11 @@ class Diffraction():
         # Set zero values to a small nonzero value to avoid division by zero
         atoms = np.arange(natom)
         pairs = np.array([[a, b] for idx, a in enumerate(atoms) for b in atoms[idx + 1:]])
-        dists = np.sqrt(np.square(self.coordinates[pairs[:, 0], :]-self.coordinates[pairs[:, 1], :]).sum(1))
-        dist_s = dists*np.tile(self.s, (len(dists), 1)).T
-        self.I_mol_1D = (abs(self.fmap[pairs[:, 0]])*abs(self.fmap[pairs[:, 1]])*(np.sin(dist_s)/dist_s).T).sum(0)*2
+        self.I_mol_1D = np.zeros_like(self.s)
+        if len(pairs)!=0:
+            dists = np.sqrt(np.square(self.coordinates[pairs[:, 0], :]-self.coordinates[pairs[:, 1], :]).sum(1))
+            dist_s = dists*np.tile(self.s, (len(dists), 1)).T
+            self.I_mol_1D = (abs(self.fmap[pairs[:, 0]])*abs(self.fmap[pairs[:, 1]])*(np.sin(dist_s)/dist_s).T).sum(0)*2
         self.sM_1D = self.s*self.I_mol_1D/self.I_at_1D # Modified molecular diffraction
         self.get_zero_crossings()
         
