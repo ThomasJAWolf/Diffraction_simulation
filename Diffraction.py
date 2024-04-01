@@ -6,7 +6,8 @@ Accelerator Laboratory (https://lcls.slac.stanford.edu/instruments/mev-ued).
 Created by Thomas Wolf, 02/26/2020
 Modified by Thomas Wolf, 12/29/2020
 Modified by Thomas Wolf, 01/01/2021
-Modified by Xinxin Cheng, 05/26/2022
+Modified by Xinxin Cheng, 05/26/2022: Include simulation capabilities for X-ray scattering
+Modified by Thoma sWolf, 04/01/2024
 """
 
 import numpy as np
@@ -113,34 +114,40 @@ class Diffraction():
                 self.XSects = pickle.load(f)
             self.a = self.XSects['C'][0,:]
         
-    def make_1D_diffraction(self):
+    def make_1D_diffraction(self, geom=None):
         """
         Function to create a 1D diffraction pattern assuming an ensemble of randomly oriented
         molecules.
+        Arguments:
+        geom: Optional for generating series of diffraction patterns from e.g. a AIMD trajectory. It assumes
+              identical number of atoms and atomic ordering for all geometries, but saves time by not completely
+              reevaluating e.g. the atomic scattering.
         """
-        natom = len(self.elements)
-        self.s = np.linspace(0,float(self.Max_s),self.Npixel)
+        if geom:
+            self.coordinates= geom.coordinates
+        if not hasattr(self, 'natom'):
+            natom = len(self.elements)
+            self.s = np.linspace(0,float(self.Max_s),self.Npixel)
+            self.s[(self.s<1.0e-18)] = 1.0e-18
+            self.I_at_1D = np.zeros((len(self.s),)) # Atomic scattering contribution to diffraction signal
+            fmap = []
+            for element in self.elements:
+                f = interp1d(self.a,np.sqrt(self.XSects[element][1,:]))
+                fmap.append(f(self.s))
+                self.I_at_1D += np.square(abs(f(self.s)))
+            self.fmap = np.array(fmap)
+        
 
         
 
-        self.I_at_1D = np.zeros((len(self.s),)) # Atomic scattering contribution to diffraction signal
-        fmap = []
-        for element in self.elements:
-            f = interp1d(self.a,np.sqrt(self.XSects[element][1,:]))
-            fmap.append(f(self.s))
-            self.I_at_1D += np.square(abs(f(self.s)))
-
         # Contribution from interference between atoms to diffaction signal:
-        self.I_mol_1D = np.zeros_like(self.I_at_1D) 
-    # Set zero values to a small nonzero value to avoid division by zero
-        for k in range(len(self.s)):
-            if (abs(self.s[k]) < 1.0e-18):
-                self.s[k]=1.0e-18
-        for i in np.arange(natom):
-            for j in np.arange(natom):
-                if i!=j:
-                    dist = np.sqrt(np.square(self.coordinates[i,:]-self.coordinates[j,:]).sum())
-                    self.I_mol_1D += abs(fmap[i])*abs(fmap[j])*np.sin(dist*self.s)/(dist*self.s)
+        self.I_mol_1D = np.zeros_like(self.I_at_1D)
+        # Set zero values to a small nonzero value to avoid division by zero
+        atoms = np.arange(natom)
+        pairs = np.array([[a, b] for idx, a in enumerate(atoms) for b in atoms[idx + 1:]])
+        dists = np.sqrt(np.square(self.coordinates[pairs[:, 0], :]-self.coordinates[pairs[:, 1], :]).sum(1))
+        dist_s = dists*np.tile(self.s, (len(dists), 1)).T
+        self.I_mol_1D = (abs(self.fmap[pairs[:, 0]])*abs(self.fmap[pairs[:, 1]])*(np.sin(dist_s)/dist_s).T).sum(0)*2
         self.sM_1D = self.s*self.I_mol_1D/self.I_at_1D # Modified molecular diffraction
         self.get_zero_crossings()
         
