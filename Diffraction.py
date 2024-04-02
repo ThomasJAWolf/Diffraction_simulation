@@ -109,7 +109,7 @@ class Diffraction():
             self.a = 4*np.pi/lambdaEl*np.sin(thetarad/2)/1E10
             
         elif (self.diffractionType == 'xray'):
-            Xsectfile='Xsects.pkl'
+            Xsectfile='XSects.pkl'
             with open(dirname + '/' + Xsectfile, "rb") as f:
                 self.XSects = pickle.load(f)
             self.a = self.XSects['C'][0,:]
